@@ -1,0 +1,13 @@
+package com.campuscare.dashboard;
+
+import com.campuscare.guest.*; import com.campuscare.issue.*; import com.campuscare.parcel.*; import com.campuscare.user.*; import lombok.RequiredArgsConstructor; import org.springframework.security.core.Authentication; import org.springframework.web.bind.annotation.*;
+import java.util.*;
+@RestController @RequestMapping("/api/dashboard") @RequiredArgsConstructor
+public class DashboardController{
+ private final IssueRepository issues; private final IssueVoteRepository votes; private final GuestRequestRepository guests; private final UserRepository users; private final ParcelRepository parcels;
+ @GetMapping("/student") public Map<String,Object> student(Authentication a){User u=me(a);List<Issue> all=issues.findAllByOrderByCreatedAtDesc();long mine=all.stream().filter(i->i.getAuthor().getId().equals(u.getId())).count();long voteCount=all.stream().mapToLong(votes::countByIssue).sum();GuestRequest g=guests.findAllByOrderByCheckInDesc().stream().filter(x->x.getStudent().getId().equals(u.getId())).findFirst().orElse(null);long waitingParcels=parcels.countByStudentAndStatus(u,ParcelStatus.WAITING_PICKUP);return Map.of("reportsFiled",mine,"totalVotes",voteCount,"guestBooking",g==null?"None":title(g.getStatus().name()),"floor",u.getFloorNumber(),"room",u.getRoomNumber(),"waitingParcels",waitingParcels);}
+ @GetMapping("/staff") public Map<String,Object> staff(Authentication a){staffOnly(a);List<Issue> all=issues.findAll();long open=all.stream().filter(i->i.getStatus()==IssueStatus.REPORTED).count(),progress=all.stream().filter(i->i.getStatus()==IssueStatus.IN_PROGRESS).count(),resolved=all.stream().filter(i->i.getStatus()==IssueStatus.RESOLVED).count(),urgent=all.stream().filter(i->!i.isPrivate()&&i.getStatus()!=IssueStatus.RESOLVED&&votes.countByIssue(i)>=15).count(),pending=guests.findAll().stream().filter(g->g.getStatus()==GuestStatus.PENDING).count(),roomIssues=all.stream().filter(i->i.isPrivate()&&i.getStatus()!=IssueStatus.RESOLVED).count(),waitingParcels=parcels.countByStatus(ParcelStatus.WAITING_PICKUP);return Map.of("open",open,"inProgress",progress,"resolved",resolved,"urgent",urgent,"pendingGuests",pending,"roomIssues",roomIssues,"waitingParcels",waitingParcels,"total",all.size());}
+ private User me(Authentication a){return users.findByEmail(a.getName()).orElseThrow();} private void staffOnly(Authentication a){if(me(a).getRole()!=Role.STAFF)throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);}
+ private String title(String s){return Arrays.stream(s.split("_")).map(x->x.substring(0,1)+x.substring(1).toLowerCase()).reduce((x,y)->x+" "+y).orElse(s);}
+}
+

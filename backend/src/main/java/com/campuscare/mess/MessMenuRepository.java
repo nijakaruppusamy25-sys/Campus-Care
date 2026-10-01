@@ -1,0 +1,1 @@
+package com.campuscare.mess; import org.springframework.data.jpa.repository.JpaRepository; import java.util.*; public interface MessMenuRepository extends JpaRepository<MessMenuItem,Long>{List<MessMenuItem> findAllByOrderByIdAsc(); Optional<MessMenuItem> findByDayOfWeekAndMeal(String day,String meal);}

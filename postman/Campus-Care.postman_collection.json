@@ -1,0 +1,12 @@
+{
+  "info": {"name":"Campus Care API","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "variable":[{"key":"baseUrl","value":"http://localhost:8080/api"},{"key":"token","value":""},{"key":"issueId","value":"1"},{"key":"guestId","value":"1"}],
+  "item":[
+    {"name":"Auth","item":[{"name":"Login Student","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"email\":\"aditi.ramesh@college.edu\",\"password\":\"password123\"}"},"url":{"raw":"{{baseUrl}}/auth/login","host":["{{baseUrl}}"],"path":["auth","login"]}}}]},
+    {"name":"Issues","item":[{"name":"List Issues","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":{"raw":"{{baseUrl}}/issues","host":["{{baseUrl}}"],"path":["issues"]}}},{"name":"Vote","request":{"method":"POST","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":{"raw":"{{baseUrl}}/issues/{{issueId}}/vote","host":["{{baseUrl}}"],"path":["issues","{{issueId}}","vote"]}}}]},
+    {"name":"Guests","item":[{"name":"List Guest Requests","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":{"raw":"{{baseUrl}}/guests","host":["{{baseUrl}}"],"path":["guests"]}}},{"name":"Availability","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":{"raw":"{{baseUrl}}/guests/availability?checkIn=2026-08-25&checkOut=2026-08-27","host":["{{baseUrl}}"],"path":["guests","availability"],"query":[{"key":"checkIn","value":"2026-08-25"},{"key":"checkOut","value":"2026-08-27"}]}}}]},
+    {"name":"Mess","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":{"raw":"{{baseUrl}}/mess","host":["{{baseUrl}}"],"path":["mess"]}}},
+    {"name":"Announcements","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":{"raw":"{{baseUrl}}/announcements","host":["{{baseUrl}}"],"path":["announcements"]}}},
+    {"name":"Directory","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{token}}"}],"url":{"raw":"{{baseUrl}}/directory","host":["{{baseUrl}}"],"path":["directory"]}}}
+  ]
+}
