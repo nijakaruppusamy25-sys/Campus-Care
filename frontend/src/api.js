@@ -7,7 +7,15 @@ async function request(path,options={}){
  let response;
  try{response=await fetch(BASE+path,{...options,headers})}
  catch(error){if(error instanceof TypeError)throw new Error(`Cannot reach the Campus Care API at ${BASE}. Check that the Spring Boot backend is running.`);throw error}
- if(!response.ok){const text=await response.text();let message=text;try{const payload=JSON.parse(text);message=payload.message||payload.error||text}catch{}throw new Error(message||`Request failed (${response.status})`)}
+ if(!response.ok){
+  if(response.status===401){
+   localStorage.removeItem('cc_token');
+   localStorage.removeItem('cc_user');
+   window.location.reload();
+   throw new Error('Your session has expired. Please log in again.');
+  }
+  const text=await response.text();let message=text;try{const payload=JSON.parse(text);message=payload.message||payload.error||text}catch{}throw new Error(message||`Request failed (${response.status})`)
+ }
  return response.status===204?null:response.json();
 }
 export const api={

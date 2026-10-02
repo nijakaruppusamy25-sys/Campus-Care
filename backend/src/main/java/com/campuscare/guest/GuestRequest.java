@@ -8,6 +8,8 @@ public class GuestRequest {
  @Column(nullable=false) String guestName;
  @Column(nullable=false) LocalDate checkIn;
  @Column(nullable=false) LocalDate checkOut;
+ private String checkInTime;
+ private String checkOutTime;
  @Enumerated(EnumType.STRING) @Column(nullable=false) GuestStatus status;
  @Enumerated(EnumType.STRING) GuestPresence guestStatus;
  String room;

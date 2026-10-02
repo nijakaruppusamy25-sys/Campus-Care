@@ -43,9 +43,14 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
-                .requestMatchers("/api/auth/**", "/uploads/**").permitAll()
+                .requestMatchers("/api/auth/**", "/uploads/**", "/error").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/directory").hasAnyRole("STUDENT","STAFF")
                 .anyRequest().authenticated())
+            .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {
+                res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                res.setContentType("application/json");
+                res.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Please log in again.\"}");
+            }))
             .addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
