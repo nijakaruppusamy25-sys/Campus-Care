@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Home, ClipboardList, Camera, Building2, Utensils, Megaphone, Users, LogOut, ArrowUp, Clock, CheckCircle2, Phone, ChevronDown, Lock, Globe, Package, Wrench, UserCheck, Check, Send, AlertCircle, HelpCircle, Search, Plus, X, Trash2, Crop } from 'lucide-react';
+import { Home, ClipboardList, Camera, Building2, Utensils, Megaphone, Users, LogOut, ArrowUp, Clock, CheckCircle2, Phone, ChevronDown, Lock, Globe, Package, Wrench, UserCheck, Check, Send, AlertCircle, HelpCircle, Search, Plus, X, Trash2, Crop, Maximize2 } from 'lucide-react';
 import { api } from './api';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
@@ -34,6 +34,52 @@ const TECHNICIANS = [
   { role: 'Security & Physical Works', name: 'Security Desk', phone: '+91 98765 43215' }
 ];
 const iconMap = { Dashboard: Home, Feed: ClipboardList, 'Report Issue': Camera, Parcels: Package, 'Parcel Desk': Package, 'Work Queue': Wrench, 'Guest Rooms': Building2, 'Mess Menu': Utensils, Announcements: Megaphone, 'Issue Queue': ClipboardList, 'Guest Requests': Building2, Directory: Phone, 'Lost & Found': HelpCircle };
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const BACKEND_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
+
+function resolveImage(url) {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  const clean = url.startsWith('/') ? url : `/${url}`;
+  return `${BACKEND_ORIGIN}${clean}`;
+}
+
+function ImageModal({ photoUrl, onClose }) {
+  if (!photoUrl) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-3xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 bg-gray-900 text-white flex items-center justify-between">
+          <span className="text-sm font-semibold flex items-center gap-2">
+            <Camera size={16} /> Attached Photo Preview
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition p-1 rounded-lg hover:bg-gray-800"
+            title="Close"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-3 bg-black flex items-center justify-center min-h-[220px]">
+          <img
+            src={photoUrl}
+            alt="Enlarged issue preview"
+            className="max-h-[75vh] max-w-full w-auto object-contain rounded-lg"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [session, setSession] = useState(() => { try { return JSON.parse(localStorage.getItem('cc_user')) || null } catch { return null } });
@@ -219,6 +265,7 @@ function FeedbackSummary({ feedback }) { return <Card title="Feedback from resol
 function StudentDashboard({ session, setPage }) {
   const request = useRequest(() => Promise.all([api.studentDash(), api.parcels(), api.mess(), api.announcements(), api.issues()]), []);
   const action = useAction();
+  const [previewPhoto, setPreviewPhoto] = useState(null);
   if (request.loading || request.error) return <><div className="mb-6"><h1 className="text-[28px] font-bold text-[#111827]">Dashboard</h1><p className="text-sm text-[#6B7280]">Welcome, {session.name}</p></div><RequestState loading={request.loading} error={request.error} onRetry={request.reload} /></>;
   const [dash, parcels, messItems, announcements, issues] = request.data;
   const waitingParcels = (parcels || []).filter(p => p.status === 'WAITING_PICKUP');
@@ -408,6 +455,18 @@ function StudentDashboard({ session, setPage }) {
                 </div>
                 <p className="text-sm font-medium text-[#111827] line-clamp-2">{issue.description}</p>
 
+                {issue.photoUrl && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewPhoto(resolveImage(issue.photoUrl))}
+                      className="text-xs text-[#2F6FED] hover:underline flex items-center gap-1 font-medium cursor-pointer"
+                    >
+                      <Camera size={13} /> View Attached Photo
+                    </button>
+                  </div>
+                )}
+
                 <div className="mt-2.5 pt-2 border-t border-[#E5E7EB] text-xs">
                   {String(issue.status).toUpperCase() === 'RESOLVED' ? (
                     <span className="font-semibold text-emerald-700 flex items-center gap-1">
@@ -441,6 +500,7 @@ function StudentDashboard({ session, setPage }) {
         )}
       </div>
     </div>
+    <ImageModal photoUrl={previewPhoto} onClose={() => setPreviewPhoto(null)} />
   </div>;
 }
 function StaffDashboard({ session, setPage }) {
@@ -501,18 +561,62 @@ function StaffDashboard({ session, setPage }) {
   </>
 }
 
-function IssueRow({ issue, staff, onChange, onFeedbackSubmitted, session, busy = false }) {
+function IssueRow({ issue, staff, onChange, onFeedbackSubmitted, session, busy = false, onPreviewPhoto }) {
   const canReview = session && issue.author === session.name && String(issue.status).toLowerCase() === 'resolved';
   return <div className="py-7 flex gap-5 items-start">
-    {issue.isPrivate ? <div className="w-16 h-16 rounded-xl bg-[#EEF3FE] border border-[#DBEAFE] text-[#2F6FED] flex flex-col items-center justify-center gap-0.5 shrink-0" title="Private room request"><Lock size={20} /><span className="text-[11px] font-bold uppercase tracking-wider">Room</span></div> : <button disabled={busy} onClick={() => onChange(issue.id)} className={`vote ${issue.voted ? 'vote-active' : ''} disabled:opacity-50`}><ArrowUp size={20} /><span>{issue.votes}</span></button>}
+    {issue.isPrivate ? (
+      <div className="w-16 h-16 rounded-xl bg-[#EEF3FE] border border-[#DBEAFE] text-[#2F6FED] flex flex-col items-center justify-center gap-0.5 shrink-0" title="Private room request">
+        <Lock size={20} />
+        <span className="text-[11px] font-bold uppercase tracking-wider">Room</span>
+      </div>
+    ) : (
+      <button disabled={busy} onClick={() => onChange(issue.id)} className={`vote ${issue.voted ? 'vote-active' : ''} disabled:opacity-50`}>
+        <ArrowUp size={20} />
+        <span>{issue.votes}</span>
+      </button>
+    )}
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <Tag>{issue.department}</Tag>
         <span className="text-[16px] text-[#6B7280]">{issue.location}</span>
         <Status>{issue.status}</Status>
-        {issue.isPrivate ? <span className="pill" style={{ color: BLUE, background: BLUE_SOFT }}>Private</span> : issue.urgent && <Status>Urgent</Status>}
+        {issue.isPrivate ? (
+          <span className="pill !bg-[#EEF3FE] !text-[#2F6FED] !border !border-[#BFDBFE] font-medium flex items-center gap-1">
+            <Lock size={12} /> Confidential to You & Warden
+          </span>
+        ) : (
+          issue.urgent && <Status>Urgent</Status>
+        )}
       </div>
       <p className="text-[18px]">{issue.description}</p>
+
+      {issue.photoUrl && (
+        <div className="mt-3">
+          <div
+            onClick={() => onPreviewPhoto?.(resolveImage(issue.photoUrl))}
+            className="inline-flex items-center gap-3 p-1.5 pr-3.5 rounded-xl border border-[#E5E7EB] bg-gray-50 hover:bg-gray-100 hover:border-[#BFDBFE] cursor-pointer transition group shadow-2xs"
+            title="Click to view full photo"
+          >
+            <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-200">
+              <img
+                src={resolveImage(issue.photoUrl)}
+                alt="Complaint attachment"
+                className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                onError={e => { e.currentTarget.parentElement.parentElement.style.display = 'none'; }}
+              />
+            </div>
+            <div className="text-left">
+              <p className="text-xs font-semibold text-[#111827] flex items-center gap-1 group-hover:text-[#2F6FED] transition">
+                <Camera size={13} className="text-[#2F6FED]" /> Attached Photo
+              </p>
+              <p className="text-[11px] text-[#6B7280] mt-0.5 flex items-center gap-1">
+                <Maximize2 size={11} /> Click to expand
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="text-[15px] text-[#6B7280] mt-2">{issue.author} · {issue.room} · {issue.time}</p>
       {canReview && (issue.feedback ? <FeedbackThanks feedback={issue.feedback} /> : <FeedbackForm issue={issue} onSubmitted={onFeedbackSubmitted} />)}
     </div>
@@ -526,7 +630,8 @@ function ActionError({ error }) { return error ? <p role="alert" className="my-3
 function Feed({ session }) {
   const request = useRequest(() => api.issues(), []);
   const action = useAction();
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('public');
+  const [previewPhoto, setPreviewPhoto] = useState(null);
 
   const vote = async id => {
     await action.run(async () => {
@@ -539,33 +644,38 @@ function Feed({ session }) {
 
   const allIssues = request.data || [];
   const publicIssues = allIssues.filter(i => !i.isPrivate);
-  const myRoomIssues = allIssues.filter(i => i.isPrivate && i.author === session.name);
+  const myRoomIssues = allIssues.filter(i => i.isPrivate && (i.author === session.name || (i.room && String(i.room) === String(session.roomNumber))));
   const issues = filter === 'public' ? publicIssues : filter === 'room' ? myRoomIssues : allIssues;
 
   return <>
     <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
       <div>
         <h1 className="text-[29px] font-semibold tracking-[-0.02em]">Feed</h1>
-        <p className="text-[18px] text-[#6B7280] mt-1">Community complaints and your private room tickets</p>
+        <p className="text-[18px] text-[#6B7280] mt-1">
+          {filter === 'room'
+            ? 'Private maintenance requests for your room (Confidential to Warden)'
+            : 'Community complaints and your private room tickets'}
+        </p>
       </div>
       <div className="flex bg-gray-100 p-1 rounded-xl">
-        <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === 'all' ? 'bg-white text-[#2F6FED] shadow-sm' : 'text-[#6B7280]'}`}>All ({allIssues.length})</button>
-        <button onClick={() => setFilter('public')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === 'public' ? 'bg-white text-[#2F6FED] shadow-sm' : 'text-[#6B7280]'}`}>Community ({publicIssues.length})</button>
-        <button onClick={() => setFilter('room')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === 'room' ? 'bg-white text-[#2F6FED] shadow-sm' : 'text-[#6B7280]'}`}>My Room ({myRoomIssues.length})</button>
+        <button onClick={() => setFilter('public')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === 'public' ? 'bg-white text-[#2F6FED] shadow-sm font-semibold' : 'text-[#6B7280]'}`}>Community Feed ({publicIssues.length})</button>
+        <button onClick={() => setFilter('room')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === 'room' ? 'bg-white text-[#2F6FED] shadow-sm font-semibold' : 'text-[#6B7280]'}`}>My Room ({myRoomIssues.length})</button>
+        <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === 'all' ? 'bg-white text-[#2F6FED] shadow-sm font-semibold' : 'text-[#6B7280]'}`}>All ({allIssues.length})</button>
       </div>
     </div>
     <ActionError error={action.error} />
     {issues.length === 0 ? (
-      <p className="py-8 text-[16px] text-[#6B7280]">{filter === 'room' ? 'No private room issues submitted yet.' : 'No issues reported yet.'}</p>
+      <p className="py-8 text-[16px] text-[#6B7280]">{filter === 'room' ? 'No private room issues submitted yet. You can submit one from Report Issue.' : 'No issues reported yet.'}</p>
     ) : (
       <div className="bg-transparent">
         {issues.map((i, n) => (
           <div key={i.id} className={n ? 'border-t border-[#E5E7EB]' : ''}>
-            <IssueRow issue={i} session={session} onFeedbackSubmitted={request.reload} onChange={vote} busy={action.pending} />
+            <IssueRow issue={i} session={session} onFeedbackSubmitted={request.reload} onChange={vote} busy={action.pending} onPreviewPhoto={setPreviewPhoto} />
           </div>
         ))}
       </div>
     )}
+    <ImageModal photoUrl={previewPhoto} onClose={() => setPreviewPhoto(null)} />
   </>;
 }
 
@@ -573,6 +683,7 @@ function IssueQueue() {
   const request = useRequest(() => api.issues(), []);
   const action = useAction();
   const [filter, setFilter] = useState('active');
+  const [previewPhoto, setPreviewPhoto] = useState(null);
   const [supervisorSelections, setSupervisorSelections] = useState({});
   const [reassigningId, setReassigningId] = useState(null);
 
@@ -644,10 +755,42 @@ function IssueQueue() {
                     ) : (
                       <span className="pill" style={{ color: AMBER, background: '#FEF3E2' }}>Needs Supervisor</span>
                     )}
+                    {i.isPrivate && (
+                      <span className="pill !bg-[#EEF3FE] !text-[#2F6FED] !border !border-[#BFDBFE] font-bold flex items-center gap-1">
+                        <Lock size={12} /> Private Room Complaint · {i.room ? `Room ${i.room}` : i.location}
+                      </span>
+                    )}
                     {!i.isPrivate && i.urgent && <Status>Urgent</Status>}
                   </div>
                   <p className="text-[15px] text-[#374151] mt-1 leading-normal">{i.description}</p>
                   <p className="text-xs text-[#9CA3AF] mt-1.5">{i.author} · Reported {i.time}</p>
+
+                  {i.photoUrl && (
+                    <div className="mt-3">
+                      <div
+                        onClick={() => setPreviewPhoto(resolveImage(i.photoUrl))}
+                        className="inline-flex items-center gap-3 p-1.5 pr-3.5 rounded-xl border border-[#E5E7EB] bg-gray-50 hover:bg-gray-100 hover:border-[#BFDBFE] cursor-pointer transition group"
+                        title="Click to view full photo"
+                      >
+                        <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-gray-200">
+                          <img
+                            src={resolveImage(i.photoUrl)}
+                            alt="Complaint attachment"
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                            onError={e => { e.currentTarget.parentElement.parentElement.style.display = 'none'; }}
+                          />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-semibold text-[#111827] flex items-center gap-1 group-hover:text-[#2F6FED] transition">
+                            <Camera size={13} className="text-[#2F6FED]" /> Attached Photo
+                          </p>
+                          <p className="text-[11px] text-[#6B7280] mt-0.5 flex items-center gap-1">
+                            <Maximize2 size={11} /> Click to expand
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -722,6 +865,7 @@ function IssueQueue() {
         })}
       </div>
     )}
+    <ImageModal photoUrl={previewPhoto} onClose={() => setPreviewPhoto(null)} />
   </>;
 }
 
@@ -729,6 +873,7 @@ function SupervisorTasks({ session }) {
   const request = useRequest(() => api.issues(), []);
   const action = useAction();
   const [filter, setFilter] = useState('pending');
+  const [previewPhoto, setPreviewPhoto] = useState(null);
 
   if (request.loading || request.error) return <><Header title="Work Queue" sub={`Welcome, ${session?.name || 'Supervisor'}`} /><RequestState loading={request.loading} error={request.error} onRetry={request.reload} /></>;
 
@@ -776,10 +921,42 @@ function SupervisorTasks({ session }) {
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-semibold text-[17px] text-[#111827]">{i.location}</span>
                   <span className="text-xs text-[#2F6FED] font-medium bg-[#EEF3FE] px-2 py-0.5 rounded-md border border-[#BFDBFE]">{i.department}</span>
+                  {i.isPrivate && (
+                    <span className="pill !bg-[#EEF3FE] !text-[#2F6FED] !border !border-[#BFDBFE] text-xs font-semibold flex items-center gap-1">
+                      <Lock size={12} /> Student Room Ticket ({i.room ? `Room ${i.room}` : i.location})
+                    </span>
+                  )}
                   {i.urgent && <Status>Urgent</Status>}
                 </div>
                 <p className="text-[15px] text-[#374151] mt-1.5 leading-normal">{i.description}</p>
                 <p className="text-xs text-[#9CA3AF] mt-1.5">{i.author ? `Reported by ${i.author} · ` : ''}{i.time}</p>
+
+                {i.photoUrl && (
+                  <div className="mt-3">
+                    <div
+                      onClick={() => setPreviewPhoto(resolveImage(i.photoUrl))}
+                      className="inline-flex items-center gap-3 p-1.5 pr-3.5 rounded-xl border border-[#E5E7EB] bg-gray-50 hover:bg-gray-100 hover:border-[#BFDBFE] cursor-pointer transition group"
+                      title="Click to view full photo"
+                    >
+                      <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-gray-200">
+                        <img
+                          src={resolveImage(i.photoUrl)}
+                          alt="Task attachment"
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                          onError={e => { e.currentTarget.parentElement.parentElement.style.display = 'none'; }}
+                        />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs font-semibold text-[#111827] flex items-center gap-1 group-hover:text-[#2F6FED] transition">
+                          <Camera size={13} className="text-[#2F6FED]" /> Attached Photo
+                        </p>
+                        <p className="text-[11px] text-[#6B7280] mt-0.5 flex items-center gap-1">
+                          <Maximize2 size={11} /> View full photo
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="shrink-0 pt-1 self-center">
@@ -802,9 +979,265 @@ function SupervisorTasks({ session }) {
         ))}
       </div>
     )}
+    <ImageModal photoUrl={previewPhoto} onClose={() => setPreviewPhoto(null)} />
   </div>;
 }
-function Report({ session }) { const [isPrivate, setIsPrivate] = useState(false), [dept, setDept] = useState('Mess'), [floor, setFloor] = useState(session?.floorNumber ?? 2), [location, setLocation] = useState(''), [desc, setDesc] = useState(''), [photo, setPhoto] = useState(null), [done, setDone] = useState(false), [validationError, setValidationError] = useState(''); const issueRequest = useRequest(() => api.issues(), []), action = useAction(); const issues = issueRequest.data || [], duplicates = !isPrivate ? issues.filter(i => !i.isPrivate && i.department === dept && i.floor === floor && i.status !== 'Resolved') : []; const handleToggleMode = toPrivate => { setIsPrivate(toPrivate); if (toPrivate) { setDept('Attached Restroom'); if (session?.floorNumber != null) setFloor(session.floorNumber); setLocation(session?.roomNumber ? `Room ${session.roomNumber} (Attached Bath)` : ''); } else { setDept('Mess'); setLocation(''); } }; const submit = async e => { e.preventDefault(); if (!desc.trim()) { setValidationError('Enter a description before submitting.'); return } setValidationError(''); const f = new FormData(); f.append('department', dept); f.append('floor', new Blob([JSON.stringify(Number(floor))], { type: 'application/json' })); f.append('location', location || (isPrivate ? `Room ${session?.roomNumber || ''}` : floorLabel(floor))); f.append('description', desc.trim()); f.append('isPrivate', isPrivate ? 'true' : 'false'); if (photo) f.append('photo', photo); const succeeded = await action.run(async () => { await api.createIssue(f); await issueRequest.reload() }); if (succeeded) { setDone(true); setTimeout(() => { setDone(false); setDesc(''); setLocation(isPrivate && session?.roomNumber ? `Room ${session.roomNumber} (Attached Bath)` : ''); setPhoto(null) }, 900) } }; const vote = async id => { await action.run(async () => { await api.vote(id); await issueRequest.reload() }) }; return <div className="max-w-[850px]"><Header title="Report Issue" sub={isPrivate ? 'Direct private maintenance for your room' : 'Communal hostel reporting with student upvoting'} /><div className="flex bg-gray-100 p-1.5 rounded-xl mb-6"><button type="button" onClick={() => handleToggleMode(false)} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-[16px] transition ${!isPrivate ? 'bg-white text-[#2F6FED] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]'}`}><Globe size={19} /><span>Common Area (Public)</span></button><button type="button" onClick={() => handleToggleMode(true)} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-[16px] transition ${isPrivate ? 'bg-white text-[#2F6FED] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]'}`}><Lock size={19} /><span>My Room (Private)</span></button></div>{done ? <p className="notice">{isPrivate ? 'Private room ticket submitted to Warden / Supervisor.' : 'Posted to feed.'}</p> : <form onSubmit={submit} className="space-y-6" noValidate><div className="grid grid-cols-2 gap-5"><Field label="Category / Department"><select className="input" value={dept} onChange={e => setDept(e.target.value)}>{(isPrivate ? ROOM_DEPARTMENTS : COMMUNAL_DEPARTMENTS).map(x => <option key={x}>{x}</option>)}</select></Field><Field label="Floor"><select className="input" value={floor} onChange={e => setFloor(+e.target.value)}>{FLOORS.map(x => <option key={x} value={x}>{floorLabel(x)}</option>)}</select></Field></div>{!isPrivate && <RequestState loading={issueRequest.loading} error={issueRequest.error} onRetry={issueRequest.reload}>{duplicates.length > 0 && <div className="bg-gray-100 rounded-xl p-4"><p className="font-medium mb-2">Already reported on {floorLabel(floor)}</p>{duplicates.map(d => <div key={d.id} className="flex items-center justify-between py-2"><span className="text-sm text-[#6B7280]">{d.description}</span><button type="button" disabled={action.pending} onClick={() => vote(d.id)} className="text-sm border rounded-lg px-3 py-1 disabled:opacity-50">Vote ({d.votes})</button></div>)}</div>}</RequestState>}<Field label={isPrivate ? 'Room / Fixture Details' : 'Location detail (optional)'}><input className="input" value={location} onChange={e => setLocation(e.target.value)} placeholder={isPrivate ? `Room ${session?.roomNumber || '214'} (e.g., Attached Bath, Desk, Fan)` : 'e.g. Block C, near water cooler'} /></Field><Field label="Photo"><label className="upload"><Camera size={22} /><span>{photo ? photo.name : 'Upload photo'}</span><input type="file" accept="image/*" className="hidden" onChange={e => setPhoto(e.target.files?.[0] || null)} /></label></Field><Field label="Description"><textarea className="input min-h-[150px]" value={desc} onChange={e => { setDesc(e.target.value); if (e.target.value.trim()) setValidationError('') }} placeholder={isPrivate ? 'Describe the issue inside your room (e.g., tap dripping, fan speed stuck, washbasin drain blocked)...' : "What's wrong?"} aria-invalid={!!validationError} aria-describedby={validationError ? 'report-description-error' : undefined} /></Field>{validationError && <p id="report-description-error" role="alert" className="-mt-4 text-sm text-red-600">{validationError}</p>}<ActionError error={action.error} /><button disabled={action.pending} className="primary w-full disabled:opacity-50">{action.pending ? 'Submitting…' : isPrivate ? 'Submit Room Request' : 'Submit to Feed'}</button></form>}</div> }
+function Report({ session }) {
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [dept, setDept] = useState('Mess');
+  const [floor, setFloor] = useState(session?.floorNumber ?? 2);
+  const [location, setLocation] = useState('');
+  const [desc, setDesc] = useState('');
+  const [photo, setPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [convertingHeic, setConvertingHeic] = useState(false);
+  const [done, setDone] = useState(false);
+  const [validationError, setValidationError] = useState('');
+  const issueRequest = useRequest(() => api.issues(), []);
+  const action = useAction();
+
+  const issues = issueRequest.data || [];
+  const duplicates = !isPrivate
+    ? issues.filter(i => !i.isPrivate && i.department === dept && i.floor === floor && i.status !== 'Resolved')
+    : [];
+
+  const handleToggleMode = toPrivate => {
+    setIsPrivate(toPrivate);
+    if (toPrivate) {
+      setDept('Attached Restroom');
+      if (session?.floorNumber != null) setFloor(session.floorNumber);
+      setLocation(session?.roomNumber ? `Room ${session.roomNumber} (Attached Bath)` : '');
+    } else {
+      setDept('Mess');
+      setLocation('');
+    }
+  };
+
+  const handlePhotoSelect = async e => {
+    let file = e.target.files?.[0] || null;
+    if (!file) return;
+
+    const isHeic = file.name.toLowerCase().endsWith('.heic') || file.type.includes('heic') || file.type.includes('heif');
+    if (isHeic) {
+      setConvertingHeic(true);
+      try {
+        const heic2any = (await import('heic2any')).default;
+        const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+        const blob = Array.isArray(converted) ? converted[0] : converted;
+        file = new File([blob], file.name.replace(/\.heic$/i, '.jpeg'), { type: 'image/jpeg' });
+      } catch (err) {
+        console.warn('HEIC conversion skipped', err);
+      } finally {
+        setConvertingHeic(false);
+      }
+    }
+
+    setPhoto(file);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemovePhoto = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhoto(null);
+    setPhotoPreview(null);
+  };
+
+  const submit = async e => {
+    e.preventDefault();
+    if (!desc.trim()) {
+      setValidationError('Enter a description before submitting.');
+      return;
+    }
+    setValidationError('');
+
+    const f = new FormData();
+    f.append('department', dept);
+    f.append('floor', String(floor));
+    f.append('location', location || (isPrivate ? `Room ${session?.roomNumber || ''}` : floorLabel(floor)));
+    f.append('description', desc.trim());
+    f.append('isPrivate', isPrivate ? 'true' : 'false');
+    if (photo) f.append('photo', photo);
+
+    const succeeded = await action.run(async () => {
+      await api.createIssue(f);
+      await issueRequest.reload();
+    });
+
+    if (succeeded) {
+      setDone(true);
+      handleRemovePhoto();
+      setTimeout(() => {
+        setDone(false);
+        setDesc('');
+        setLocation(isPrivate && session?.roomNumber ? `Room ${session.roomNumber} (Attached Bath)` : '');
+      }, 1000);
+    }
+  };
+
+  const vote = async id => {
+    await action.run(async () => {
+      await api.vote(id);
+      await issueRequest.reload();
+    });
+  };
+
+  return (
+    <div className="max-w-[850px]">
+      <Header
+        title="Report Issue"
+        sub={isPrivate ? 'Direct private maintenance for your room · Confidential to Warden' : 'Communal hostel reporting with student upvoting'}
+      />
+
+      <div className="flex bg-gray-100 p-1.5 rounded-xl mb-6">
+        <button
+          type="button"
+          onClick={() => handleToggleMode(false)}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-[16px] transition ${!isPrivate ? 'bg-white text-[#2F6FED] shadow-sm font-semibold' : 'text-[#6B7280] hover:text-[#111827]'}`}
+        >
+          <Globe size={19} />
+          <span>Common Area (Public Feed)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleToggleMode(true)}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-[16px] transition ${isPrivate ? 'bg-white text-[#2F6FED] shadow-sm font-semibold' : 'text-[#6B7280] hover:text-[#111827]'}`}
+        >
+          <Lock size={19} />
+          <span>My Room (Private Ticket)</span>
+        </button>
+      </div>
+
+      {isPrivate && (
+        <div className="mb-6 p-4 rounded-xl bg-[#EEF3FE] border border-[#BFDBFE] text-sm text-[#1E40AF] flex items-center gap-2.5">
+          <Lock size={18} className="shrink-0 text-[#2F6FED]" />
+          <span>
+            <strong>Confidential Request:</strong> This ticket is only visible to you and the Hostel Warden. It will <u>not</u> appear in other students' feeds.
+          </span>
+        </div>
+      )}
+
+      {done ? (
+        <p className="notice">
+          {isPrivate ? '✓ Private room ticket submitted directly to the Hostel Warden.' : '✓ Posted to communal feed.'}
+        </p>
+      ) : (
+        <form onSubmit={submit} className="space-y-6" noValidate>
+          <div className="grid grid-cols-2 gap-5">
+            <Field label="Category / Department">
+              <select className="input" value={dept} onChange={e => setDept(e.target.value)}>
+                {(isPrivate ? ROOM_DEPARTMENTS : COMMUNAL_DEPARTMENTS).map(x => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Floor">
+              <select className="input" value={floor} onChange={e => setFloor(+e.target.value)}>
+                {FLOORS.map(x => (
+                  <option key={x} value={x}>{floorLabel(x)}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          {!isPrivate && (
+            <RequestState loading={issueRequest.loading} error={issueRequest.error} onRetry={issueRequest.reload}>
+              {duplicates.length > 0 && (
+                <div className="bg-gray-100 rounded-xl p-4">
+                  <p className="font-medium mb-2">Already reported on {floorLabel(floor)}</p>
+                  {duplicates.map(d => (
+                    <div key={d.id} className="flex items-center justify-between py-2">
+                      <span className="text-sm text-[#6B7280]">{d.description}</span>
+                      <button
+                        type="button"
+                        disabled={action.pending}
+                        onClick={() => vote(d.id)}
+                        className="text-sm border rounded-lg px-3 py-1 disabled:opacity-50"
+                      >
+                        Vote ({d.votes})
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </RequestState>
+          )}
+
+          <Field label={isPrivate ? 'Room / Fixture Details' : 'Location detail (optional)'}>
+            <input
+              className="input"
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder={isPrivate ? `Room ${session?.roomNumber || '214'} (e.g., Attached Bath, Desk, Fan)` : 'e.g. Block C, near water cooler'}
+            />
+          </Field>
+
+          <Field label="Photo Attachment (Optional)">
+            <label className="upload cursor-pointer">
+              <Camera size={22} className="text-[#2F6FED]" />
+              <span>{convertingHeic ? 'Converting HEIC photo…' : photo ? photo.name : 'Upload photo (JPG, PNG, HEIC)'}</span>
+              <input
+                type="file"
+                accept="image/*,.heic,.HEIC"
+                className="hidden"
+                disabled={convertingHeic}
+                onChange={handlePhotoSelect}
+              />
+            </label>
+
+            {photoPreview && (
+              <div className="mt-3 relative inline-block">
+                <img
+                  src={photoPreview}
+                  alt="Attachment preview"
+                  className="w-32 h-24 object-cover rounded-xl border border-[#CBD5E1] shadow-xs"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 shadow-md hover:bg-red-700 transition"
+                  title="Remove photo"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </Field>
+
+          <Field label="Description">
+            <textarea
+              className="input min-h-[150px]"
+              value={desc}
+              onChange={e => {
+                setDesc(e.target.value);
+                if (e.target.value.trim()) setValidationError('');
+              }}
+              placeholder={
+                isPrivate
+                  ? 'Describe the issue inside your room (e.g., tap dripping, fan speed stuck, washbasin drain blocked)...'
+                  : "What's wrong?"
+              }
+              aria-invalid={!!validationError}
+              aria-describedby={validationError ? 'report-description-error' : undefined}
+            />
+          </Field>
+
+          {validationError && (
+            <p id="report-description-error" role="alert" className="-mt-4 text-sm text-red-600 font-medium">
+              {validationError}
+            </p>
+          )}
+
+          <ActionError error={action.error} />
+
+          <button disabled={action.pending || convertingHeic} className="primary w-full disabled:opacity-50">
+            {action.pending ? 'Submitting…' : isPrivate ? 'Submit Room Request to Warden' : 'Submit to Community Feed'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
 
 function StudentParcels() { const request = useRequest(() => api.parcels(), []); const parcels = request.data || []; const waiting = parcels.filter(p => p.status === 'WAITING_PICKUP'); const collected = parcels.filter(p => p.status === 'COLLECTED'); return <div className="max-w-[850px]"><Header title="My Deliveries" sub="Gate 1 Security Desk · Show your 4-digit OTP upon collection" /><h2 className="text-[20px] font-semibold mb-4 flex items-center gap-2.5"><span>Waiting for Pickup</span><span className="pill" style={{ color: waiting.length > 0 ? BLUE : '#6B7280', background: waiting.length > 0 ? BLUE_SOFT : '#F3F4F6' }}>{waiting.length}</span></h2>{waiting.length === 0 ? <p className="py-6 text-[15px] text-[#6B7280] mb-6">No parcels waiting for pickup.</p> : <div className="space-y-5 mb-8">{waiting.map(p => <div key={p.id} className="bg-white border-2 border-[#BFDBFE] rounded-2xl p-6 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#E5E7EB]"><div className="flex items-center gap-3"><span className="font-semibold text-[17px] text-[#2F6FED]">{p.courier}</span><Tag>{p.parcelCode}</Tag>{p.trackingNumber && <span className="text-sm text-[#6B7280]">AWB: {p.trackingNumber}</span>}</div><span className="pill" style={{ color: AMBER, background: '#FEF3E2' }}>Waiting at Gate</span></div>{p.notes && <p className="text-[17px] mt-4 font-medium text-[#111827]">{p.notes}</p>}<div className="bg-[#F8FAFC] border-2 border-dashed border-[#CBD5E1] rounded-2xl p-5 my-4 flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">Pickup Verification OTP</p><p className="text-[34px] font-mono font-bold tracking-widest text-[#2F6FED] leading-none mt-1.5">{p.otp}</p></div><div className="text-right"><p className="text-[15px] font-medium text-[#111827]">Show code at Gate 1</p><p className="text-xs text-[#6B7280] mt-0.5">{p.storageLocation || 'Security Desk'}</p></div></div><div className="flex flex-wrap items-center justify-between gap-4 pt-2 text-sm text-[#6B7280]"><span>Arrived: {p.arrivedAt}</span><span className="text-xs font-semibold text-[#2F6FED] bg-[#EEF3FE] px-3 py-1.5 rounded-lg border border-[#BFDBFE]">Collect with OTP at Gate Desk</span></div></div>)}</div>}<h2 className="text-[20px] font-semibold mb-4">Past Deliveries</h2><RequestState loading={request.loading} error={request.error} onRetry={request.reload}>{collected.length === 0 ? <p className="text-[15px] text-[#6B7280]">No past delivery records.</p> : <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden divide-y divide-[#E5E7EB]">{collected.map(p => <div key={p.id} className="p-5 flex flex-wrap items-center justify-between gap-4"><div><div className="flex items-center gap-2.5 mb-1"><span className="font-medium text-[16px]">{p.courier}</span><Tag>{p.parcelCode}</Tag>{p.notes && <span className="text-[15px] text-[#6B7280]">· {p.notes}</span>}</div><p className="text-sm text-[#6B7280]">Arrived {p.arrivedAt} · Collected {p.collectedAt || 'Recently'}</p></div><span className="pill" style={{ color: GREEN, background: '#E9F7EE' }}>Collected</span></div>)}</div>}</RequestState></div> }
 
@@ -1217,12 +1650,6 @@ function LostFound({ session, role }) {
       await api.deleteLostItem(id);
       await request.reload();
     });
-  };
-
-  const resolveImage = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    return `http://localhost:8080${url}?t=1790847990`;
   };
 
   return (

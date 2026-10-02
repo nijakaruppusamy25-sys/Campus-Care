@@ -21,18 +21,58 @@ public class IssueController {
  record AssignSupervisorRequest(String technician, String instructions){}
  record ReportCompletionRequest(String report){}
 
- @GetMapping public List<IssueDto> all(Authentication auth){ User me=users.findByEmail(auth.getName()).orElseThrow(); return issues.findAllByOrderByCreatedAtDesc().stream().filter(i->me.getRole()==Role.STAFF||!i.isPrivate()||i.getAuthor().getId().equals(me.getId())).map(i->dto(i,me)).toList(); }
- @PostMapping(consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
- public IssueDto create(@RequestPart("department") String department,@RequestPart(value="floor",required=false) String floor,@RequestPart("location") String location,@RequestPart("description") String description,@RequestPart(value="isPrivate",required=false) String isPrivate,@RequestPart(value="photo",required=false) MultipartFile photo,Authentication auth) throws IOException {
-   User me=users.findByEmail(auth.getName()).orElseThrow(); String photoUrl=null;
-   if(photo!=null&&!photo.isEmpty()){ Path dir=Paths.get(uploadDir); Files.createDirectories(dir); String name=UUID.randomUUID()+"-"+Path.of(photo.getOriginalFilename()).getFileName(); Files.copy(photo.getInputStream(),dir.resolve(name),StandardCopyOption.REPLACE_EXISTING); photoUrl="/uploads/"+name; }
-   Integer floorNum=null;
-   if(floor!=null&&!floor.isBlank()&&!floor.equalsIgnoreCase("null")){
-     try{ floorNum=Integer.valueOf(floor.trim()); }catch(NumberFormatException ignored){}
-   }
-   boolean privateIssue=isPrivate!=null&&(isPrivate.equalsIgnoreCase("true")||isPrivate.equals("1"));
-   Issue i=issues.save(Issue.builder().department(department).floorNumber(floorNum).location(location).description(description).photoUrl(photoUrl).status(IssueStatus.REPORTED).isPrivate(privateIssue).author(me).createdAt(LocalDateTime.now()).build()); return dto(i,me);
- }
+  @GetMapping 
+  public List<IssueDto> all(Authentication auth) { 
+    User me = users.findByEmail(auth.getName()).orElseThrow(); 
+    boolean isSupervisor = me.getEmail().toLowerCase().contains("supervisor") || me.getName().toLowerCase().contains("supervisor");
+    boolean isWarden = me.getRole() == Role.STAFF && !isSupervisor;
+    return issues.findAllByOrderByCreatedAtDesc().stream()
+        .filter(i -> {
+            if (isWarden) return true; // Warden oversees all issues including private room tickets
+            if (isSupervisor) return !i.isPrivate() || i.isAssignedToSupervisor(); // Supervisor only sees communal issues or assigned private tasks
+            return !i.isPrivate() || i.getAuthor().getId().equals(me.getId()); // Other students CANNOT view another student's private room issues
+        })
+        .map(i -> dto(i, me)).toList(); 
+  }
+
+  @PostMapping(consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
+  public IssueDto create(
+      @RequestParam("department") String department,
+      @RequestParam(value="floor", required=false) String floor,
+      @RequestParam("location") String location,
+      @RequestParam("description") String description,
+      @RequestParam(value="isPrivate", required=false) String isPrivate,
+      @RequestParam(value="photo", required=false) MultipartFile photo,
+      Authentication auth) throws IOException {
+    User me = users.findByEmail(auth.getName()).orElseThrow(); 
+    String photoUrl = null;
+    if (photo != null && !photo.isEmpty()) { 
+      Path dir = Paths.get(uploadDir).toAbsolutePath().normalize(); 
+      Files.createDirectories(dir); 
+      String orig = photo.getOriginalFilename() != null ? Path.of(photo.getOriginalFilename()).getFileName().toString() : "photo.jpg";
+      String sanitized = orig.replaceAll("[^a-zA-Z0-9.-]", "_");
+      String name = UUID.randomUUID() + "-" + sanitized; 
+      Files.copy(photo.getInputStream(), dir.resolve(name), StandardCopyOption.REPLACE_EXISTING); 
+      photoUrl = "/uploads/" + name; 
+    }
+    Integer floorNum = null;
+    if (floor != null && !floor.isBlank() && !floor.equalsIgnoreCase("null")) {
+      try { floorNum = Integer.valueOf(floor.trim()); } catch (NumberFormatException ignored) {}
+    }
+    boolean privateIssue = isPrivate != null && (isPrivate.equalsIgnoreCase("true") || isPrivate.equals("1"));
+    Issue i = issues.save(Issue.builder()
+        .department(department)
+        .floorNumber(floorNum)
+        .location(location)
+        .description(description)
+        .photoUrl(photoUrl)
+        .status(IssueStatus.REPORTED)
+        .isPrivate(privateIssue)
+        .author(me)
+        .createdAt(LocalDateTime.now())
+        .build()); 
+    return dto(i, me);
+  }
  @PostMapping("/{id}/vote") public IssueDto vote(@PathVariable Long id,Authentication auth){ User me=users.findByEmail(auth.getName()).orElseThrow(); Issue i=issues.findById(id).orElseThrow(); if(i.isPrivate()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Private room issues do not accept community votes"); if(votes.existsByIssueAndUser(i,me)) votes.deleteByIssueAndUser(i,me); else votes.save(IssueVote.builder().issue(i).user(me).build()); return dto(i,me); }
 
  @PostMapping("/{id}/assign-supervisor")
