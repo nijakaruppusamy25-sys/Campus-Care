@@ -580,13 +580,7 @@ function IssueRow({ issue, staff, onChange, onFeedbackSubmitted, session, busy =
         <Tag>{issue.department}</Tag>
         <span className="text-[16px] text-[#6B7280]">{issue.location}</span>
         <Status>{issue.status}</Status>
-        {issue.isPrivate ? (
-          <span className="pill !bg-[#EEF3FE] !text-[#2F6FED] !border !border-[#BFDBFE] font-medium flex items-center gap-1">
-            <Lock size={12} /> Confidential to You & Warden
-          </span>
-        ) : (
-          issue.urgent && <Status>Urgent</Status>
-        )}
+        {issue.urgent && <Status>Urgent</Status>}
       </div>
       <p className="text-[18px]">{issue.description}</p>
 
@@ -653,7 +647,7 @@ function Feed({ session }) {
         <h1 className="text-[29px] font-semibold tracking-[-0.02em]">Feed</h1>
         <p className="text-[18px] text-[#6B7280] mt-1">
           {filter === 'room'
-            ? 'Private maintenance requests for your room (Confidential to Warden)'
+            ? 'Maintenance requests for your room'
             : 'Community complaints and your private room tickets'}
         </p>
       </div>
@@ -755,12 +749,7 @@ function IssueQueue() {
                     ) : (
                       <span className="pill" style={{ color: AMBER, background: '#FEF3E2' }}>Needs Supervisor</span>
                     )}
-                    {i.isPrivate && (
-                      <span className="pill !bg-[#EEF3FE] !text-[#2F6FED] !border !border-[#BFDBFE] font-bold flex items-center gap-1">
-                        <Lock size={12} /> Private Room Complaint · {i.room ? `Room ${i.room}` : i.location}
-                      </span>
-                    )}
-                    {!i.isPrivate && i.urgent && <Status>Urgent</Status>}
+                    {i.urgent && <Status>Urgent</Status>}
                   </div>
                   <p className="text-[15px] text-[#374151] mt-1 leading-normal">{i.description}</p>
                   <p className="text-xs text-[#9CA3AF] mt-1.5">{i.author} · Reported {i.time}</p>
@@ -921,11 +910,6 @@ function SupervisorTasks({ session }) {
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-semibold text-[17px] text-[#111827]">{i.location}</span>
                   <span className="text-xs text-[#2F6FED] font-medium bg-[#EEF3FE] px-2 py-0.5 rounded-md border border-[#BFDBFE]">{i.department}</span>
-                  {i.isPrivate && (
-                    <span className="pill !bg-[#EEF3FE] !text-[#2F6FED] !border !border-[#BFDBFE] text-xs font-semibold flex items-center gap-1">
-                      <Lock size={12} /> Student Room Ticket ({i.room ? `Room ${i.room}` : i.location})
-                    </span>
-                  )}
                   {i.urgent && <Status>Urgent</Status>}
                 </div>
                 <p className="text-[15px] text-[#374151] mt-1.5 leading-normal">{i.description}</p>
@@ -1086,7 +1070,7 @@ function Report({ session }) {
     <div className="max-w-[850px]">
       <Header
         title="Report Issue"
-        sub={isPrivate ? 'Direct private maintenance for your room · Confidential to Warden' : 'Communal hostel reporting with student upvoting'}
+        sub={isPrivate ? 'Direct maintenance request for your room' : 'Communal hostel reporting with student upvoting'}
       />
 
       <div className="flex bg-gray-100 p-1.5 rounded-xl mb-6">
@@ -1096,7 +1080,7 @@ function Report({ session }) {
           className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-[16px] transition ${!isPrivate ? 'bg-white text-[#2F6FED] shadow-sm font-semibold' : 'text-[#6B7280] hover:text-[#111827]'}`}
         >
           <Globe size={19} />
-          <span>Common Area (Public Feed)</span>
+          <span>Common Area</span>
         </button>
         <button
           type="button"
@@ -1104,22 +1088,13 @@ function Report({ session }) {
           className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-[16px] transition ${isPrivate ? 'bg-white text-[#2F6FED] shadow-sm font-semibold' : 'text-[#6B7280] hover:text-[#111827]'}`}
         >
           <Lock size={19} />
-          <span>My Room (Private Ticket)</span>
+          <span>My Room</span>
         </button>
       </div>
 
-      {isPrivate && (
-        <div className="mb-6 p-4 rounded-xl bg-[#EEF3FE] border border-[#BFDBFE] text-sm text-[#1E40AF] flex items-center gap-2.5">
-          <Lock size={18} className="shrink-0 text-[#2F6FED]" />
-          <span>
-            <strong>Confidential Request:</strong> This ticket is only visible to you and the Hostel Warden. It will <u>not</u> appear in other students' feeds.
-          </span>
-        </div>
-      )}
-
       {done ? (
         <p className="notice">
-          {isPrivate ? '✓ Private room ticket submitted directly to the Hostel Warden.' : '✓ Posted to communal feed.'}
+          {isPrivate ? '✓ Private room ticket submitted.' : '✓ Posted to communal feed.'}
         </p>
       ) : (
         <form onSubmit={submit} className="space-y-6" noValidate>
@@ -1231,7 +1206,7 @@ function Report({ session }) {
           <ActionError error={action.error} />
 
           <button disabled={action.pending || convertingHeic} className="primary w-full disabled:opacity-50">
-            {action.pending ? 'Submitting…' : isPrivate ? 'Submit Room Request to Warden' : 'Submit to Community Feed'}
+            {action.pending ? 'Submitting…' : isPrivate ? 'Submit Room Request' : 'Submit to Community Feed'}
           </button>
         </form>
       )}
