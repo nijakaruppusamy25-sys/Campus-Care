@@ -13,6 +13,7 @@ public class Issue {
  private Integer floorNumber;
  @Column(nullable=false) private String location;
  @Column(nullable=false, length=2000) private String description;
+ @Column(name = "photo_url", columnDefinition = "LONGTEXT")
  private String photoUrl;
  @Enumerated(EnumType.STRING) @Column(nullable=false) private IssueStatus status;
  private boolean isPrivate;

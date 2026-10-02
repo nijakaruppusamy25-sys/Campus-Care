@@ -5,6 +5,7 @@ import com.campuscare.directory.*;
 import com.campuscare.guest.*;
 import com.campuscare.issue.*;
 import com.campuscare.mess.*;
+import com.campuscare.lostitem.*;
 import com.campuscare.parcel.*;
 import com.campuscare.user.Role;
 import com.campuscare.user.User;
@@ -12,13 +13,16 @@ import com.campuscare.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.*; import java.util.*;
 
 @Configuration @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
- private final UserRepository users; private final PasswordEncoder encoder; private final IssueRepository issues; private final IssueVoteRepository votes; private final GuestRequestRepository guests; private final MessMenuRepository menu; private final AnnouncementRepository announcements; private final DirectoryRepository directory; private final ParcelRepository parcels;
+ private final UserRepository users; private final PasswordEncoder encoder; private final IssueRepository issues; private final IssueVoteRepository votes; private final GuestRequestRepository guests; private final MessMenuRepository menu; private final AnnouncementRepository announcements; private final DirectoryRepository directory; private final ParcelRepository parcels; private final LostItemRepository lostItems; private final JdbcTemplate jdbcTemplate;
  @Override public void run(String... args){
+  try { jdbcTemplate.execute("ALTER TABLE lost_items MODIFY COLUMN photo_url LONGTEXT"); } catch (Exception ignored) {}
+  try { jdbcTemplate.execute("ALTER TABLE issues MODIFY COLUMN photo_url LONGTEXT"); } catch (Exception ignored) {}
   if(users.count()==0){
     User a=users.save(User.builder().email("24z202@psgitech.ac.in").password(encoder.encode("password123")).name("Nija K").role(Role.STUDENT).roomNumber("214").floorNumber(2).floorRep(true).build());
     User k=users.save(User.builder().email("24z200@psgitech.ac.in").password(encoder.encode("password123")).name("Navina M").role(Role.STUDENT).roomNumber("201").floorNumber(2).build());
@@ -61,6 +65,7 @@ public class DataInitializer implements CommandLineRunner {
   }
   syncDirectory();
   syncMenu();
+  syncLostItems();
  }
  private Issue issue(String d,Integer f,String l,String desc,User u,IssueStatus st,int days){return Issue.builder().department(d).floorNumber(f).location(l).description(desc).author(u).status(st).isPrivate(false).createdAt(LocalDateTime.now().minusDays(days)).build();}
  private void seedVotes(Issue issue,User author,int n){for(int i=0;i<n;i++){User u=users.findAll().get(i%users.findAll().size());if(!votes.existsByIssueAndUser(issue,u))votes.save(IssueVote.builder().issue(issue).user(u).build());}}
@@ -98,6 +103,68 @@ public class DataInitializer implements CommandLineRunner {
     for (String[] e : entries) {
       if (directory.findAll().stream().noneMatch(x -> x.getPhone().equals(e[2]))) {
         directory.save(DirectoryEntry.builder().role(e[0]).name(e[1]).phone(e[2]).build());
+      }
+    }
+  }
+
+  private void syncLostItems() {
+    if (lostItems.count() == 0) {
+      User a = users.findByEmail("24z202@psgitech.ac.in").orElse(null);
+      User k = users.findByEmail("24z200@psgitech.ac.in").orElse(null);
+      User s = users.findByEmail("24z201@psgitech.ac.in").orElse(null);
+      User r = users.findByEmail("24z173@psgitech.ac.in").orElse(null);
+      if (a != null) {
+        lostItems.save(LostItem.builder()
+            .title("Steel Water Bottle")
+            .itemType("LOST")
+            .location("Dining Mess")
+            .roomNumber("507")
+            .description("I lost my water bottle in Mess today morning. It will be like this. If anyone mistook it please return it to room no. 507")
+            .photoUrl("/lost-found/lost-water-bottle.jpg")
+            .status("CLAIMED")
+            .author(a)
+            .createdAt(LocalDateTime.now().minusDays(1))
+            .claimedAt(LocalDateTime.now().minusHours(2))
+            .build());
+      }
+      if (s != null) {
+        lostItems.save(LostItem.builder()
+            .title("Striped Blue Laundry Sock")
+            .itemType("LOST")
+            .location("Laundry Room")
+            .roomNumber("605")
+            .description("The other pair went missing in the laundry. If anyone has it, pls return to Rathna, room no. 605")
+            .photoUrl("/lost-found/lost-striped-sock.jpg")
+            .status("OPEN")
+            .author(s)
+            .createdAt(LocalDateTime.now().minusHours(6))
+            .build());
+      }
+      if (r != null) {
+        lostItems.save(LostItem.builder()
+            .title("Black Cotton Sock")
+            .itemType("FOUND")
+            .location("Misplaced in Bucket")
+            .roomNumber("501")
+            .description("This socks is misplaced with my bucket. The owner please collect it from room no 501.")
+            .photoUrl("/lost-found/found-black-sock.jpg")
+            .status("OPEN")
+            .author(r)
+            .createdAt(LocalDateTime.now().minusHours(8))
+            .build());
+      }
+      if (k != null) {
+        lostItems.save(LostItem.builder()
+            .title("Yellow Heart Handkerchief")
+            .itemType("FOUND")
+            .location("Misplaced in Bucket")
+            .roomNumber("615")
+            .description("This hand kerchief is misplaced in my bucket. Please ask the owner to collect it from room 615.")
+            .photoUrl("/lost-found/found-heart-handkerchief.jpg")
+            .status("OPEN")
+            .author(k)
+            .createdAt(LocalDateTime.now().minusHours(10))
+            .build());
       }
     }
   }

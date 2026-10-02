@@ -1,8 +1,8 @@
 # Java
 backend/target/
 target/
-backend/uploads/
-uploads/
+/backend/uploads/
+/uploads/
 *.class
 
 # Node

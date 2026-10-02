@@ -31,6 +31,7 @@ public class LostItem {
     @Column(nullable = false, length = 3000)
     private String description;
 
+    @Column(name = "photo_url", columnDefinition = "LONGTEXT")
     private String photoUrl;
 
     @Column(nullable = false)

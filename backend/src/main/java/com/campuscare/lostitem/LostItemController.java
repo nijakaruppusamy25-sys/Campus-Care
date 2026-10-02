@@ -58,11 +58,25 @@ public class LostItemController {
         User me = users.findByEmail(auth.getName()).orElseThrow();
         String photoUrl = null;
         if (photo != null && !photo.isEmpty()) {
-            Path dir = Paths.get(uploadDir);
+            Path dir = Paths.get(uploadDir).toAbsolutePath().normalize();
             Files.createDirectories(dir);
-            String name = UUID.randomUUID() + "-" + Path.of(photo.getOriginalFilename()).getFileName();
-            Files.copy(photo.getInputStream(), dir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
-            photoUrl = "/uploads/" + name;
+            String orig = photo.getOriginalFilename() != null ? Path.of(photo.getOriginalFilename()).getFileName().toString() : "photo.jpg";
+            String sanitized = orig.replaceAll("[^a-zA-Z0-9.-]", "_");
+            String name = UUID.randomUUID() + "-" + sanitized;
+            try {
+                Files.copy(photo.getInputStream(), dir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception ignored) {}
+            // Persist as Base64 data URL if size allows so ephemeral cloud platforms (e.g. Render) retain images permanently
+            try {
+                if (photo.getSize() <= 2 * 1024 * 1024) {
+                    String mime = photo.getContentType() != null && !photo.getContentType().isBlank() ? photo.getContentType() : "image/jpeg";
+                    photoUrl = "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(photo.getBytes());
+                } else {
+                    photoUrl = "/uploads/" + name;
+                }
+            } catch (Exception e) {
+                photoUrl = "/uploads/" + name;
+            }
         }
         String cleanType = "FOUND".equalsIgnoreCase(itemType) ? "FOUND" : "LOST";
         LostItem item = repo.save(LostItem.builder()

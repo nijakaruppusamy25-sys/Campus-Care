@@ -52,8 +52,20 @@ public class IssueController {
       String orig = photo.getOriginalFilename() != null ? Path.of(photo.getOriginalFilename()).getFileName().toString() : "photo.jpg";
       String sanitized = orig.replaceAll("[^a-zA-Z0-9.-]", "_");
       String name = UUID.randomUUID() + "-" + sanitized; 
-      Files.copy(photo.getInputStream(), dir.resolve(name), StandardCopyOption.REPLACE_EXISTING); 
-      photoUrl = "/uploads/" + name; 
+      try {
+        Files.copy(photo.getInputStream(), dir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
+      } catch (Exception ignored) {}
+      // Persist as Base64 data URL if size allows so ephemeral cloud platforms (e.g. Render) retain images permanently
+      try {
+        if (photo.getSize() <= 2 * 1024 * 1024) {
+          String mime = photo.getContentType() != null && !photo.getContentType().isBlank() ? photo.getContentType() : "image/jpeg";
+          photoUrl = "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(photo.getBytes());
+        } else {
+          photoUrl = "/uploads/" + name;
+        }
+      } catch (Exception e) {
+        photoUrl = "/uploads/" + name;
+      }
     }
     Integer floorNum = null;
     if (floor != null && !floor.isBlank() && !floor.equalsIgnoreCase("null")) {
