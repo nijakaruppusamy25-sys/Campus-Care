@@ -46,6 +46,14 @@ function resolveImage(url) {
 }
 
 function ImageModal({ photoUrl, onClose }) {
+  const [loadError, setLoadError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoadError(false);
+    setLoading(true);
+  }, [photoUrl]);
+
   if (!photoUrl) return null;
   return (
     <div
@@ -53,7 +61,7 @@ function ImageModal({ photoUrl, onClose }) {
       onClick={onClose}
     >
       <div
-        className="relative max-w-3xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        className="relative max-w-3xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         <div className="px-4 py-3 bg-gray-900 text-white flex items-center justify-between">
@@ -69,12 +77,35 @@ function ImageModal({ photoUrl, onClose }) {
             <X size={20} />
           </button>
         </div>
-        <div className="p-3 bg-black flex items-center justify-center min-h-[220px]">
-          <img
-            src={photoUrl}
-            alt="Enlarged issue preview"
-            className="max-h-[75vh] max-w-full w-auto object-contain rounded-lg"
-          />
+        <div className="relative p-4 bg-gray-950 flex items-center justify-center min-h-[280px]">
+          {loading && !loadError && (
+            <div className="text-gray-400 text-sm flex items-center gap-2">
+              <span className="inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
+              Loading photo…
+            </div>
+          )}
+          {loadError ? (
+            <div className="text-center py-8 px-4 text-gray-400">
+              <Camera size={36} className="mx-auto mb-2 text-gray-600" />
+              <p className="text-sm font-medium">Unable to load photo preview.</p>
+              <a
+                href={photoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-block text-xs text-blue-400 hover:underline"
+              >
+                Open image directly
+              </a>
+            </div>
+          ) : (
+            <img
+              src={photoUrl}
+              alt="Enlarged issue preview"
+              onLoad={() => setLoading(false)}
+              onError={() => { setLoading(false); setLoadError(true); }}
+              className={`max-h-[75vh] max-w-full w-auto object-contain rounded-lg transition-opacity duration-200 ${loading ? 'opacity-0 h-0 w-0' : 'opacity-100'}`}
+            />
+          )}
         </div>
       </div>
     </div>
