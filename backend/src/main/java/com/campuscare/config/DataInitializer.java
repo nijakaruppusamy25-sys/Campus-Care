@@ -59,12 +59,7 @@ public class DataInitializer implements CommandLineRunner {
   if(users.findByEmail("supervisor3@psgitech.ac.in").isEmpty()){
    users.save(User.builder().email("supervisor3@psgitech.ac.in").password(encoder.encode("password123")).name("Archana (Supervisor)").role(Role.STAFF).build());
   }
-  if(directory.findAll().stream().noneMatch(x -> x.getRole().toLowerCase().contains("warden"))){
-   directory.save(DirectoryEntry.builder().role("Hostel Warden").name("Dr. K. Swaminathan (Warden Office)").phone("+91 98765 43220").build());
-   directory.save(DirectoryEntry.builder().role("Hostel Supervisor").name("R. Sundaram (Supervisor Desk - Block A & B)").phone("+91 98765 43221").build());
-   directory.save(DirectoryEntry.builder().role("Hostel Supervisor").name("M. Natarajan (Supervisor Desk - Block C & Services)").phone("+91 98765 43222").build());
-   directory.save(DirectoryEntry.builder().role("Hostel Supervisor").name("K. Venu (Supervisor Desk - Mess & Common)").phone("+91 98765 43223").build());
-  }
+  syncDirectory();
   syncMenu();
  }
  private Issue issue(String d,Integer f,String l,String desc,User u,IssueStatus st,int days){return Issue.builder().department(d).floorNumber(f).location(l).description(desc).author(u).status(st).isPrivate(false).createdAt(LocalDateTime.now().minusDays(days)).build();}
@@ -85,4 +80,25 @@ public class DataInitializer implements CommandLineRunner {
      menu.save(entry);
     }));
  }
+
+  private void syncDirectory() {
+    List<String[]> entries = List.of(
+        new String[]{"Electrician", "Murugan K.", "+91 98765 43210"},
+        new String[]{"Plumber", "Raghavan S.", "+91 98765 43211"},
+        new String[]{"Carpenter", "Vijay R.", "+91 98765 43212"},
+        new String[]{"Food Department", "Mess Office", "+91 98765 43213"},
+        new String[]{"Clinic", "Health Centre", "+91 98765 43214"},
+        new String[]{"Emergency", "Security Desk", "+91 98765 43215"},
+        new String[]{"Hostel Warden", "Puvaneshwari (Chief Warden)", "+91 98765 43220"},
+        new String[]{"Hostel Warden", "Jeyashree (Resident Warden)", "+91 98765 43224"},
+        new String[]{"Hostel Supervisor", "Indra (Supervisor Desk - Block A & B)", "+91 98765 43221"},
+        new String[]{"Hostel Supervisor", "Thangam (Supervisor Desk - Block C & Services)", "+91 98765 43222"},
+        new String[]{"Hostel Supervisor", "Archana (Supervisor Desk - Mess & Common)", "+91 98765 43223"}
+    );
+    for (String[] e : entries) {
+      if (directory.findAll().stream().noneMatch(x -> x.getPhone().equals(e[2]))) {
+        directory.save(DirectoryEntry.builder().role(e[0]).name(e[1]).phone(e[2]).build());
+      }
+    }
+  }
 }
